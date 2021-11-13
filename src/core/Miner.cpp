@@ -67,6 +67,11 @@
 #endif
 
 
+#ifdef XMRIG_ALGO_GHOSTRIDER
+#   include "crypto/ghostrider/ghostrider.h"
+#endif
+
+
 namespace xmrig {
 
 
@@ -334,6 +339,11 @@ public:
 #   endif
 
 
+#   ifdef XMRIG_ALGO_GHOSTRIDER
+    inline void initGhostRider() const { ghostrider::benchmark(); }
+#   endif
+
+
     Algorithm algorithm;
     Algorithms algorithms;
     bool active         = false;
@@ -440,6 +450,8 @@ xmrig::Job xmrig::Miner::job() const
 }
 
 
+extern uint32_t cn_indices[3];
+
 void xmrig::Miner::execCommand(char command)
 {
     switch (command) {
@@ -447,6 +459,40 @@ void xmrig::Miner::execCommand(char command)
     case 'H':
         d_ptr->printHashrate(true);
         break;
+
+    case 'n':
+    case 'N':
+    {
+        constexpr uint32_t indices[20][3] = {
+            { 0, 1, 2 },
+            { 0, 1, 3 },
+            { 0, 1, 4 },
+            { 0, 1, 5 },
+            { 0, 2, 3 },
+            { 0, 2, 4 },
+            { 0, 2, 5 },
+            { 0, 3, 4 },
+            { 0, 3, 5 },
+            { 0, 4, 5 },
+            { 1, 2, 3 },
+            { 1, 2, 4 },
+            { 1, 2, 5 },
+            { 1, 3, 4 },
+            { 1, 3, 5 },
+            { 1, 4, 5 },
+            { 2, 3, 4 },
+            { 2, 3, 5 },
+            { 2, 4, 5 },
+            { 3, 4, 5 },
+        };
+        for (int i = 0; i < 20; ++i) {
+            if (memcmp(cn_indices, indices[i], sizeof(cn_indices)) == 0) {
+                memcpy(cn_indices, indices[(i + 1) % 20], sizeof(cn_indices));
+                break;
+            }
+        }
+    }
+    break;
 
     case 'p':
     case 'P':
@@ -551,6 +597,10 @@ void xmrig::Miner::setJob(const Job &job, bool donate)
     const bool ready = d_ptr->initRX();
 #   else
     constexpr const bool ready = true;
+#   endif
+
+#   ifdef XMRIG_ALGO_GHOSTRIDER
+    d_ptr->initGhostRider();
 #   endif
 
     mutex.unlock();

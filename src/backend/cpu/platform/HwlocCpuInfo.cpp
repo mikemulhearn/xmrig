@@ -296,6 +296,18 @@ void xmrig::HwlocCpuInfo::processTopLevelCache(hwloc_obj_t cache, const Algorith
     cores.reserve(m_cores);
     findByType(cache, HWLOC_OBJ_CORE, [&cores](hwloc_obj_t found) { cores.emplace_back(found); });
 
+#   ifdef XMRIG_ALGO_GHOSTRIDER
+    if ((algorithm == Algorithm::GHOSTRIDER_RTM) && (PUs > cores.size()) && (PUs < cores.size() * 2)) {
+        // Don't use E-cores on Alder Lake
+        cores.erase(std::remove_if(cores.begin(), cores.end(), [](hwloc_obj_t c) { return hwloc_bitmap_weight(c->cpuset) == 1; }), cores.end());
+
+        // This shouldn't happen, but check it anyway
+        if (cores.empty()) {
+            findByType(cache, HWLOC_OBJ_CORE, [&cores](hwloc_obj_t found) { cores.emplace_back(found); });
+        }
+    }
+#   endif
+
     size_t L3               = cache->attr->cache.size;
     const bool L3_exclusive = isCacheExclusive(cache);
     size_t L2               = 0;
@@ -350,6 +362,15 @@ void xmrig::HwlocCpuInfo::processTopLevelCache(hwloc_obj_t cache, const Algorith
     if (limit > 0) {
         cacheHashes = std::min(cacheHashes, limit);
     }
+
+#   ifdef XMRIG_ALGO_GHOSTRIDER
+    if (algorithm == Algorithm::GHOSTRIDER_RTM) {
+        // GhostRider implementation runs 8 hashes at a time
+        intensity = 8;
+        // Always 1 thread per core (it uses additional helper thread when possible)
+        cacheHashes = std::min(cacheHashes, cores.size());
+    }
+#   endif
 
     if (cacheHashes >= PUs) {
         for (hwloc_obj_t core : cores) {
