@@ -34,6 +34,7 @@
 #include "crypto/rx/Rx.h"
 #include "crypto/rx/RxDataset.h"
 #include "crypto/rx/RxVm.h"
+#include "crypto/ghostrider/ghostrider.h"
 #include "net/JobResults.h"
 
 
@@ -213,6 +214,13 @@ bool xmrig::CpuWorker<N>::selfTest()
     }
 #   endif
 
+#   ifdef XMRIG_ALGO_GHOSTRIDER
+    if (m_algorithm.family() == Algorithm::GHOSTRIDER) {
+        // TODO
+        return true;
+    }
+#   endif
+
     return false;
 }
 
@@ -300,16 +308,25 @@ void xmrig::CpuWorker<N>::start()
             else
 #           endif
             {
+                switch (job.algorithm().family()) {
+
 #               ifdef XMRIG_ALGO_ASTROBWT
-                if (job.algorithm().family() == Algorithm::ASTROBWT) {
+                case Algorithm::ASTROBWT:
                     if (!astrobwt::astrobwt_dero(m_job.blob(), job.size(), m_ctx[0]->memory, m_hash, m_astrobwtMaxSize, m_astrobwtAVX2)) {
                         valid = false;
                     }
-                }
-                else
+                    break;
 #               endif
-                {
+
+#               ifdef XMRIG_ALGO_GHOSTRIDER
+                case Algorithm::GHOSTRIDER:
+                    ghostrider::hash_single(m_ctx, m_job.blob(), job.size(), m_hash);
+                    break;
+#               endif
+
+                default:
                     fn(job.algorithm())(m_job.blob(), job.size(), m_hash, m_ctx, job.height());
+                    break;
                 }
 
                 if (!nextRound()) {
